@@ -3,7 +3,6 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { env } from './env';
 import { userModel } from '../models/user.model';
 import { logger } from '../utils/logger';
-import { authService } from '../services/auth.service';
 
 export const configurePassport = (): void => {
   // Serialize user for session
@@ -30,7 +29,7 @@ export const configurePassport = (): void => {
           clientSecret: env.GOOGLE_CLIENT_SECRET,
           callbackURL: env.GOOGLE_CALLBACK_URL,
         },
-        async (accessToken, refreshToken, profile, done) => {
+        async (_accessToken, _refreshToken, profile, done) => {
           try {
             // Check if user exists
             let user = await userModel.findByEmail(profile.emails?.[0]?.value || '');

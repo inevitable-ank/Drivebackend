@@ -17,11 +17,11 @@ router.get('/me', authenticate, (req, res, next) => authController.getCurrentUse
 router.post('/logout', authenticate, (req, res, next) => authController.logout(req, res, next));
 
 // Google OAuth routes (will be implemented later)
-router.get('/google', (req, res) => {
+router.get('/google', (_req, res) => {
   res.status(501).json({ message: 'Google OAuth not implemented yet' });
 });
 
-router.get('/google/callback', (req, res) => {
+router.get('/google/callback', (_req, res) => {
   res.status(501).json({ message: 'Google OAuth callback not implemented yet' });
 });
 

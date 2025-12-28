@@ -94,7 +94,7 @@ export class AuthController {
     }
   }
 
-  async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async logout(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       // In a stateless JWT system, logout is handled client-side
       // But we can still provide an endpoint for consistency
