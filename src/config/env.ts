@@ -24,6 +24,7 @@ export const env = {
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
 
   // Database
+  DATABASE_URL: process.env.DATABASE_URL || '',
   MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/twospoon-drive',
 
   // Session
