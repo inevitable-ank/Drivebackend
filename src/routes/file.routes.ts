@@ -6,6 +6,8 @@ const router = Router();
 
 router.post('/upload', authenticate, fileController.upload.bind(fileController));
 
+router.post('/folder', authenticate, fileController.createFolder.bind(fileController));
+
 router.get('/', authenticate, fileController.getFiles.bind(fileController));
 
 router.get('/search', authenticate, fileController.searchFiles.bind(fileController));

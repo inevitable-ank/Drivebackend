@@ -63,15 +63,50 @@ const initializeSchema = async (client: PoolClient): Promise<void> => {
         user_id VARCHAR(255) NOT NULL,
         name VARCHAR(500) NOT NULL,
         original_name VARCHAR(500) NOT NULL,
-        file_path TEXT NOT NULL,
+        file_path TEXT,
         file_url TEXT,
         storage_type VARCHAR(20) NOT NULL DEFAULT 'local',
         mime_type VARCHAR(100),
         size BIGINT NOT NULL DEFAULT 0,
+        parent_id VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_id) REFERENCES files(id) ON DELETE CASCADE
       )
+    `);
+
+    // Migration: Make file_path nullable for folders and add parent_id
+    await client.query(`
+      DO $$ 
+      BEGIN
+        -- Make file_path nullable if it's currently NOT NULL (for folders)
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'files' 
+          AND column_name = 'file_path' 
+          AND is_nullable = 'NO'
+        ) THEN
+          ALTER TABLE files ALTER COLUMN file_path DROP NOT NULL;
+        END IF;
+        
+        -- Add parent_id column if it doesn't exist
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'files' AND column_name = 'parent_id'
+        ) THEN
+          ALTER TABLE files ADD COLUMN parent_id VARCHAR(255);
+        END IF;
+        
+        -- Add foreign key constraint for parent_id if it doesn't exist
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints 
+          WHERE constraint_name = 'fk_files_parent_id' AND table_name = 'files'
+        ) THEN
+          ALTER TABLE files ADD CONSTRAINT fk_files_parent_id 
+            FOREIGN KEY (parent_id) REFERENCES files(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
     `);
 
     await client.query(`
@@ -80,6 +115,14 @@ const initializeSchema = async (client: PoolClient): Promise<void> => {
 
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_files_name ON files(name)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_files_parent_id ON files(parent_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_files_user_parent ON files(user_id, parent_id)
     `);
 
     await client.query(`

@@ -7,11 +7,12 @@ export interface File {
   user_id: string;
   name: string;
   original_name: string;
-  file_path: string;
+  file_path: string | null;
   file_url?: string | null;
   storage_type: 'local' | 's3';
   mime_type?: string | null;
   size: number;
+  parent_id?: string | null;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -20,11 +21,12 @@ export interface CreateFileData {
   user_id: string;
   name: string;
   original_name: string;
-  file_path: string;
+  file_path: string | null;
   file_url?: string | null;
   storage_type: 'local' | 's3';
   mime_type?: string | null;
   size: number;
+  parent_id?: string | null;
 }
 
 export interface UpdateFileData {
@@ -41,9 +43,9 @@ export class FileModel {
   async create(fileData: CreateFileData): Promise<File> {
     const id = uuidv4();
     const query = `
-      INSERT INTO files (id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, created_at, updated_at
+      INSERT INTO files (id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, parent_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, parent_id, created_at, updated_at
     `;
 
     const values = [
@@ -56,6 +58,7 @@ export class FileModel {
       fileData.storage_type,
       fileData.mime_type || null,
       fileData.size,
+      fileData.parent_id || null,
     ];
 
     const result = await this.pool.query(query, values);
@@ -64,7 +67,7 @@ export class FileModel {
 
   async findById(id: string): Promise<File | null> {
     const query = `
-      SELECT id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, created_at, updated_at
+      SELECT id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, parent_id, created_at, updated_at
       FROM files
       WHERE id = $1
     `;
@@ -78,22 +81,32 @@ export class FileModel {
     return this.mapRowToFile(result.rows[0]);
   }
 
-  async findByUserId(userId: string, limit: number = 100, offset: number = 0): Promise<File[]> {
-    const query = `
-      SELECT id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, created_at, updated_at
+  async findByUserId(userId: string, limit: number = 100, offset: number = 0, parentId: string | null = null): Promise<File[]> {
+    let query = `
+      SELECT id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, parent_id, created_at, updated_at
       FROM files
       WHERE user_id = $1
-      ORDER BY created_at DESC
-      LIMIT $2 OFFSET $3
     `;
+    const values: any[] = [userId];
+    let paramCount = 2;
 
-    const result = await this.pool.query(query, [userId, limit, offset]);
+    if (parentId === null) {
+      query += ` AND (parent_id IS NULL)`;
+    } else {
+      query += ` AND parent_id = $${paramCount++}`;
+      values.push(parentId);
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount}`;
+    values.push(limit, offset);
+
+    const result = await this.pool.query(query, values);
     return result.rows.map(row => this.mapRowToFile(row));
   }
 
   async searchByUserId(userId: string, searchTerm: string, limit: number = 100, offset: number = 0): Promise<File[]> {
     const query = `
-      SELECT id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, created_at, updated_at
+      SELECT id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, parent_id, created_at, updated_at
       FROM files
       WHERE user_id = $1 AND (name ILIKE $2 OR original_name ILIKE $2)
       ORDER BY created_at DESC
@@ -126,7 +139,7 @@ export class FileModel {
       UPDATE files
       SET ${fields.join(', ')}
       WHERE id = $${paramCount}
-      RETURNING id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, created_at, updated_at
+      RETURNING id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, parent_id, created_at, updated_at
     `;
 
     const result = await this.pool.query(query, values);
@@ -159,6 +172,23 @@ export class FileModel {
     return parseInt(result.rows[0].count, 10);
   }
 
+  async findByNameAndParent(userId: string, name: string, parentId: string | null): Promise<File | null> {
+    const query = `
+      SELECT id, user_id, name, original_name, file_path, file_url, storage_type, mime_type, size, parent_id, created_at, updated_at
+      FROM files
+      WHERE user_id = $1 AND name = $2 AND (parent_id IS NULL AND $3::text IS NULL OR parent_id = $3)
+      LIMIT 1
+    `;
+
+    const result = await this.pool.query(query, [userId, name, parentId || null]);
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return this.mapRowToFile(result.rows[0]);
+  }
+
   private mapRowToFile(row: any): File {
     return {
       id: row.id,
@@ -170,6 +200,7 @@ export class FileModel {
       storage_type: row.storage_type,
       mime_type: row.mime_type,
       size: row.size,
+      parent_id: row.parent_id || null,
       created_at: row.created_at,
       updated_at: row.updated_at,
     };

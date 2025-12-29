@@ -26,7 +26,8 @@ export class FileController {
         }
 
         const customName = req.body.name;
-        const file = await fileService.uploadFile(req.file, user.id, customName);
+        const parentId = req.body.parent_id || null;
+        const file = await fileService.uploadFile(req.file, user.id, customName, parentId);
 
         sendSuccessResponse(
           res,
@@ -35,6 +36,14 @@ export class FileController {
           HTTP_STATUS.CREATED
         );
       } catch (error: any) {
+        if (error.message === 'Parent folder not found') {
+          sendErrorResponse(res, error.message, HTTP_STATUS.NOT_FOUND);
+          return;
+        }
+        if (error.message === 'Parent must be a folder' || error.message.includes('Unauthorized')) {
+          sendErrorResponse(res, error.message, HTTP_STATUS.FORBIDDEN);
+          return;
+        }
         logger.error('Upload error:', error);
         next(error);
       }
@@ -51,8 +60,9 @@ export class FileController {
 
       const limit = parseInt(req.query.limit as string) || 100;
       const offset = parseInt(req.query.offset as string) || 0;
+      const parentId = req.query.parent_id as string | undefined;
 
-      const result = await fileService.getFiles(user.id, limit, offset);
+      const result = await fileService.getFiles(user.id, limit, offset, parentId || null);
 
       sendSuccessResponse(res, 'Files retrieved successfully', result);
     } catch (error: any) {
@@ -223,6 +233,51 @@ export class FileController {
         return;
       }
       logger.error('Download file error:', error);
+      next(error);
+    }
+  }
+
+  async createFolder(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const user = (req as any).user;
+      if (!user || !user.id) {
+        sendErrorResponse(res, 'User not authenticated', HTTP_STATUS.UNAUTHORIZED);
+        return;
+      }
+
+      const { name, parent_id } = req.body;
+
+      if (!name || typeof name !== 'string') {
+        sendErrorResponse(res, 'Folder name is required', HTTP_STATUS.BAD_REQUEST);
+        return;
+      }
+
+      const folder = await fileService.createFolder(user.id, name, parent_id || null);
+
+      sendSuccessResponse(
+        res,
+        'Folder created successfully',
+        { folder },
+        HTTP_STATUS.CREATED
+      );
+    } catch (error: any) {
+      if (error.message === 'Folder name is required') {
+        sendErrorResponse(res, error.message, HTTP_STATUS.BAD_REQUEST);
+        return;
+      }
+      if (error.message === 'A folder with this name already exists') {
+        sendErrorResponse(res, error.message, HTTP_STATUS.CONFLICT);
+        return;
+      }
+      if (error.message === 'Parent folder not found') {
+        sendErrorResponse(res, error.message, HTTP_STATUS.NOT_FOUND);
+        return;
+      }
+      if (error.message === 'Parent must be a folder' || error.message.includes('Unauthorized')) {
+        sendErrorResponse(res, error.message, HTTP_STATUS.FORBIDDEN);
+        return;
+      }
+      logger.error('Create folder error:', error);
       next(error);
     }
   }

@@ -261,6 +261,16 @@ export class ShareService {
       throw new Error('File not found');
     }
 
+    // Folders cannot be downloaded
+    if (file.mime_type === 'folder') {
+      throw new Error('Folders cannot be downloaded');
+    }
+
+    // Ensure file_path exists (should always be present for non-folder files)
+    if (!file.file_path) {
+      throw new Error('File path not found');
+    }
+
     const buffer = await storageService.download(file.file_path, file.storage_type);
     
     return {
