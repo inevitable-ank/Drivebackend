@@ -1,5 +1,6 @@
 import { fileModel, File, CreateFileData } from '../models/file.model';
 import { storageService } from './storage.service';
+import { shareService } from './share.service';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
@@ -57,7 +58,12 @@ export class FileService {
       return null;
     }
 
-    if (file.user_id !== userId) {
+    if (file.user_id === userId) {
+      return file;
+    }
+
+    const access = await shareService.checkFileAccess(fileId, userId);
+    if (!access.hasAccess) {
       throw new Error('Unauthorized access to file');
     }
 
@@ -128,16 +134,18 @@ export class FileService {
       throw new Error('File not found');
     }
 
-    if (file.user_id !== userId) {
+    if (file.user_id === userId) {
+      const buffer = await storageService.download(file.file_path, file.storage_type);
+      return { file, buffer };
+    }
+
+    const access = await shareService.checkFileAccess(fileId, userId);
+    if (!access.hasAccess) {
       throw new Error('Unauthorized access to file');
     }
 
     const buffer = await storageService.download(file.file_path, file.storage_type);
-
-    return {
-      file,
-      buffer,
-    };
+    return { file, buffer };
   }
 }
 

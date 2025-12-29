@@ -82,8 +82,8 @@ app.get('/health', (_req: Request, res: Response) => {
 
 
 app.use('/api/auth', authRoutes);
+app.use('/api', shareRoutes);
 app.use('/api/files', fileRoutes);
-app.use('/api/share', shareRoutes);
 
 
 app.use((_req: Request, res: Response) => {

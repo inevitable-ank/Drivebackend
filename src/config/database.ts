@@ -105,6 +105,29 @@ const initializeSchema = async (client: PoolClient): Promise<void> => {
       CREATE INDEX IF NOT EXISTS idx_file_shares_shared_with_id ON file_shares(shared_with_id)
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS share_links (
+        id VARCHAR(255) PRIMARY KEY,
+        file_id VARCHAR(255) NOT NULL,
+        owner_id VARCHAR(255) NOT NULL,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        permission VARCHAR(20) NOT NULL DEFAULT 'view',
+        expires_at TIMESTAMP,
+        password VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+        FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_share_links_token ON share_links(token)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_share_links_file_id ON share_links(file_id)
+    `);
+
     logger.info('Database schema initialized successfully');
   } catch (error) {
     logger.error('Schema initialization failed:', error);
