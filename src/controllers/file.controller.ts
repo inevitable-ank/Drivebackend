@@ -70,6 +70,11 @@ export class FileController {
       }
 
       const { id } = req.params;
+      if (!id) {
+        sendErrorResponse(res, 'File ID is required', HTTP_STATUS.BAD_REQUEST);
+        return;
+      }
+
       const file = await fileService.getFileById(id, user.id);
 
       if (!file) {
@@ -97,6 +102,11 @@ export class FileController {
       }
 
       const { id } = req.params;
+      if (!id) {
+        sendErrorResponse(res, 'File ID is required', HTTP_STATUS.BAD_REQUEST);
+        return;
+      }
+
       await fileService.deleteFile(id, user.id);
 
       sendSuccessResponse(res, 'File deleted successfully', null, HTTP_STATUS.NO_CONTENT);
@@ -123,6 +133,11 @@ export class FileController {
       }
 
       const { id } = req.params;
+      if (!id) {
+        sendErrorResponse(res, 'File ID is required', HTTP_STATUS.BAD_REQUEST);
+        return;
+      }
+
       const { name } = req.body;
 
       if (!name || typeof name !== 'string') {
@@ -186,6 +201,11 @@ export class FileController {
       }
 
       const { id } = req.params;
+      if (!id) {
+        sendErrorResponse(res, 'File ID is required', HTTP_STATUS.BAD_REQUEST);
+        return;
+      }
+
       const { file, buffer } = await fileService.getFileDownload(id, user.id);
 
       res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
