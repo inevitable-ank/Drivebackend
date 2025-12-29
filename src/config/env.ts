@@ -33,7 +33,8 @@ export const env = {
   // Google OAuth
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
-  GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback',
+  // Support both GOOGLE_CALLBACK_URL and GOOGLE_REDIRECT_URI for compatibility
+  GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/auth/google/callback',
 
   // JWT
   JWT_SECRET: process.env.JWT_SECRET || 'your-jwt-secret-change-in-production',

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
 import { sendSuccessResponse, sendErrorResponse } from '../utils/helpers';
 import { HTTP_STATUS } from '../utils/constants';
+import { logger } from '../utils/logger';
 
 export class AuthController {
   async signup(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -101,6 +102,48 @@ export class AuthController {
       sendSuccessResponse(res, 'Logged out successfully');
     } catch (error: any) {
       next(error);
+    }
+  }
+
+  async googleAuth(_req: Request, _res: Response, next: NextFunction): Promise<void> {
+    try {
+      // This will be handled by passport middleware
+      // The actual redirect happens in the route handler
+      next();
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  async googleCallback(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const error = req.query.error as string | undefined;
+
+      // Handle OAuth errors
+      if (error) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        res.redirect(`${frontendUrl}/auth/callback?error=${encodeURIComponent(error)}`);
+        return;
+      }
+
+      // If no user, authentication failed
+      if (!user) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        res.redirect(`${frontendUrl}/auth/callback?error=authentication_failed`);
+        return;
+      }
+
+      // Generate JWT token and redirect to frontend
+      const result = await authService.handleGoogleOAuth(user);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      
+      // Redirect to frontend with token
+      res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(result.token)}`);
+    } catch (error: any) {
+      logger.error('Google OAuth callback error:', error);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      res.redirect(`${frontendUrl}/auth/callback?error=authentication_failed`);
     }
   }
 }

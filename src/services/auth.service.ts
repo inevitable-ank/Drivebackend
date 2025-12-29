@@ -115,6 +115,18 @@ export class AuthService {
       return null;
     }
   }
+
+  
+  async handleGoogleOAuth(user: User): Promise<AuthResponse> {
+    const token = this.generateToken(user.id);
+
+    const { password, ...userWithoutPassword } = user;
+
+    return {
+      user: userWithoutPassword,
+      token,
+    };
+  }
 }
 
 export const authService = new AuthService();

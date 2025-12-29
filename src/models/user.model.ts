@@ -98,6 +98,10 @@ export class UserModel {
       fields.push(`picture = $${paramCount++}`);
       values.push(updates.picture);
     }
+    if (updates.provider !== undefined) {
+      fields.push(`provider = $${paramCount++}`);
+      values.push(updates.provider);
+    }
 
     if (fields.length === 0) {
       return this.findById(id);

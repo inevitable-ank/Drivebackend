@@ -20,7 +20,7 @@ export const configurePassport = (): void => {
     }
   });
 
-  // Google OAuth Strategy (will be fully implemented when Google OAuth is set up)
+  // Google OAuth Strategy
   if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
     passport.use(
       new GoogleStrategy(
@@ -31,18 +31,26 @@ export const configurePassport = (): void => {
         },
         async (_accessToken, _refreshToken, profile, done) => {
           try {
+            const email = profile.emails?.[0]?.value;
+            if (!email) {
+              return done(new Error('No email provided by Google'), undefined);
+            }
+
             // Check if user exists
-            let user = await userModel.findByEmail(profile.emails?.[0]?.value || '');
+            let user = await userModel.findByEmail(email);
 
             if (user) {
-              // User exists, return user
+              // User exists - update with Google info (picture, provider)
+              user = await userModel.update(user.id, {
+                picture: profile.photos?.[0]?.value || user.picture,
+                provider: 'google',
+              });
+              if (!user) {
+                return done(new Error('Failed to update user'), undefined);
+              }
               return done(null, user);
             } else {
               // Create new user
-              const email = profile.emails?.[0]?.value;
-              if (!email) {
-                return done(new Error('No email provided by Google'), undefined);
-              }
               user = await userModel.create({
                 email,
                 name: profile.displayName || '',
