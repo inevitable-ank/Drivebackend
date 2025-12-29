@@ -277,6 +277,35 @@ export class ShareController {
       next(error);
     }
   }
+
+  async downloadSharedFile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.params;
+      if (!token) {
+        sendErrorResponse(res, 'Share token is required', HTTP_STATUS.BAD_REQUEST);
+        return;
+      }
+
+      const { file, buffer } = await shareService.downloadFileByShareToken(token);
+
+      res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+      res.setHeader('Content-Length', buffer.length);
+
+      res.send(buffer);
+    } catch (error: any) {
+      if (error.message === 'Invalid or expired share link' || error.message === 'Share link has expired') {
+        sendErrorResponse(res, error.message, HTTP_STATUS.NOT_FOUND);
+        return;
+      }
+      if (error.message === 'File not found') {
+        sendErrorResponse(res, error.message, HTTP_STATUS.NOT_FOUND);
+        return;
+      }
+      logger.error('Download shared file error:', error);
+      next(error);
+    }
+  }
 }
 
 export const shareController = new ShareController();

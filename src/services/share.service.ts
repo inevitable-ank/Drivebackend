@@ -1,6 +1,7 @@
 import { shareModel, FileShare, ShareLink } from '../models/share.model';
 import { fileModel } from '../models/file.model';
 import { userModel } from '../models/user.model';
+import { storageService } from './storage.service';
 import { env } from '../config/env';
 
 export interface ShareWithUserData {
@@ -240,6 +241,31 @@ export class ShareService {
     return {
       file,
       permission: shareLink.permission,
+    };
+  }
+
+  async downloadFileByShareToken(token: string): Promise<{ file: any; buffer: Buffer }> {
+    const shareLink = await shareModel.getShareLinkByToken(token);
+    
+    if (!shareLink) {
+      throw new Error('Invalid or expired share link');
+    }
+
+    if (shareLink.expires_at && new Date(shareLink.expires_at) < new Date()) {
+      throw new Error('Share link has expired');
+    }
+
+    const file = await fileModel.findById(shareLink.file_id);
+    
+    if (!file) {
+      throw new Error('File not found');
+    }
+
+    const buffer = await storageService.download(file.file_path, file.storage_type);
+    
+    return {
+      file,
+      buffer,
     };
   }
 

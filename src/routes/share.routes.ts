@@ -16,6 +16,8 @@ router.delete('/files/:id/share-link', authenticate, shareController.removeShare
 
 router.get('/files/shared', authenticate, shareController.getSharedFiles.bind(shareController));
 
+router.get('/files/shared/:token/download', shareController.downloadSharedFile.bind(shareController));
+
 router.get('/files/shared/:token', shareController.getFileByShareToken.bind(shareController));
 
 export default router;
