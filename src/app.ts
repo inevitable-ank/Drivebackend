@@ -29,9 +29,44 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 
+// CORS configuration - handle both HTTP and HTTPS for the same domain
+const getCorsOrigin = () => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const origins = [frontendUrl];
+  
+  // If FRONTEND_URL is HTTP, also allow HTTPS version (common issue)
+  if (frontendUrl.startsWith('http://')) {
+    origins.push(frontendUrl.replace('http://', 'https://'));
+  }
+  // If FRONTEND_URL is HTTPS, also allow HTTP version (for local development)
+  if (frontendUrl.startsWith('https://') && process.env.NODE_ENV !== 'production') {
+    origins.push(frontendUrl.replace('https://', 'http://'));
+  }
+  
+  return origins;
+};
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = getCorsOrigin();
+      
+      // Check if origin matches any allowed origin
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        // In production, be strict; in development, allow for debugging
+        if (process.env.NODE_ENV === 'production') {
+          logger.warn(`CORS blocked origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
+          callback(new Error('Not allowed by CORS'));
+        } else {
+          callback(null, true); // Allow in development for debugging
+        }
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
