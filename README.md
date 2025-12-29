@@ -354,7 +354,223 @@ For production deployments, configure AWS S3:
 
 ## 🚢 Deployment
 
-### Environment Setup
+### Deploying to Render
+
+[Render](https://render.com) is a cloud platform that makes it easy to deploy and scale your applications. Follow these steps to deploy TwoSpoon Backend on Render:
+
+#### Prerequisites
+
+1. **GitHub Account**: Push your code to a GitHub repository
+2. **Render Account**: Sign up at [render.com](https://render.com) (free tier available)
+3. **AWS Account** (for S3 storage): Create an AWS account and S3 bucket
+
+#### Step 1: Prepare Your Repository
+
+1. Ensure all your code is committed and pushed to GitHub:
+   ```bash
+   git add .
+   git commit -m "Prepare for Render deployment"
+   git push origin main
+   ```
+
+2. The repository should include:
+   - `render.yaml` (already created)
+   - `.nvmrc` (already created)
+   - All source files
+   - `package.json` with correct scripts
+
+#### Step 2: Create PostgreSQL Database on Render
+
+1. Log in to [Render Dashboard](https://dashboard.render.com)
+2. Click **"New +"** → **"PostgreSQL"**
+3. Configure:
+   - **Name**: `twospoon-db` (or your preferred name)
+   - **Database**: `twospoon_drive`
+   - **User**: `twospoon_user` (or auto-generated)
+   - **Region**: Choose closest to your users
+   - **Plan**: Starter (free) or higher
+4. Click **"Create Database"**
+5. **Important**: Copy the **Internal Database URL** - you'll need this later
+
+#### Step 3: Set Up AWS S3 (Required for Production)
+
+⚠️ **Important**: Render's filesystem is ephemeral. You **MUST** use S3 for file storage in production.
+
+1. **Create S3 Bucket**:
+   - Go to [AWS S3 Console](https://s3.console.aws.amazon.com/)
+   - Click **"Create bucket"**
+   - Choose a unique bucket name (e.g., `twospoon-files-production`)
+   - Select a region
+   - Uncheck "Block all public access" (or configure CORS properly)
+   - Click **"Create bucket"**
+
+2. **Create IAM User for S3 Access**:
+   - Go to [IAM Console](https://console.aws.amazon.com/iam/)
+   - Click **"Users"** → **"Create user"**
+   - Username: `twospoon-s3-user`
+   - Check **"Provide user access to the AWS Management Console"** (optional)
+   - Click **"Next"**
+
+3. **Attach S3 Policy**:
+   - Click **"Attach policies directly"**
+   - Search and select **"AmazonS3FullAccess"** (or create a custom policy with only your bucket)
+   - Click **"Next"** → **"Create user"**
+
+4. **Create Access Keys**:
+   - Click on the created user
+   - Go to **"Security credentials"** tab
+   - Click **"Create access key"**
+   - Select **"Application running outside AWS"**
+   - Click **"Next"** → **"Create access key"**
+   - **IMPORTANT**: Copy both **Access Key ID** and **Secret Access Key** (you won't see the secret again!)
+
+#### Step 4: Configure Google OAuth
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Select your project
+3. Go to **"APIs & Services"** → **"Credentials"**
+4. Edit your OAuth 2.0 Client ID
+5. Add authorized redirect URI:
+   - `https://your-app-name.onrender.com/api/auth/google/callback`
+   - Replace `your-app-name` with your Render service name
+6. Save changes
+
+#### Step 5: Deploy Web Service on Render
+
+**Option A: Using render.yaml (Recommended)**
+
+1. In Render Dashboard, click **"New +"** → **"Blueprint"**
+2. Connect your GitHub repository
+3. Render will automatically detect `render.yaml`
+4. Review the configuration and click **"Apply"**
+
+**Option B: Manual Setup**
+
+1. In Render Dashboard, click **"New +"** → **"Web Service"**
+2. Connect your GitHub repository
+3. Configure the service:
+   - **Name**: `twospoon-backend` (or your preferred name)
+   - **Environment**: `Node`
+   - **Region**: Same as your database
+   - **Branch**: `main` (or your default branch)
+   - **Root Directory**: Leave empty (or `./` if needed)
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+4. Click **"Advanced"** and set:
+   - **Health Check Path**: `/health`
+
+#### Step 6: Configure Environment Variables
+
+In your Render Web Service dashboard, go to **"Environment"** tab and add:
+
+**Required Variables:**
+
+```env
+NODE_ENV=production
+PORT=10000
+FRONTEND_URL=https://your-frontend-domain.com
+
+# Database (from Step 2)
+DATABASE_URL=<Internal Database URL from Render PostgreSQL>
+
+# Security Secrets (generate strong random strings)
+SESSION_SECRET=<generate-a-strong-random-string>
+JWT_SECRET=<generate-a-different-strong-random-string>
+JWT_EXPIRES_IN=7d
+
+# Google OAuth (from Step 4)
+GOOGLE_CLIENT_ID=<your-google-client-id>
+GOOGLE_CLIENT_SECRET=<your-google-client-secret>
+GOOGLE_CALLBACK_URL=https://your-app-name.onrender.com/api/auth/google/callback
+
+# AWS S3 (from Step 3) - REQUIRED for production
+STORAGE_TYPE=s3
+AWS_ACCESS_KEY_ID=<your-aws-access-key-id>
+AWS_SECRET_ACCESS_KEY=<your-aws-secret-access-key>
+AWS_REGION=<your-s3-bucket-region>
+AWS_S3_BUCKET_NAME=<your-s3-bucket-name>
+
+# Optional
+MAX_FILE_SIZE=104857600
+```
+
+**Generate Strong Secrets:**
+
+You can generate secure secrets using:
+```bash
+# On Linux/Mac
+openssl rand -base64 32
+
+# Or use an online generator like: https://randomkeygen.com/
+```
+
+**Important Notes:**
+- Replace `<your-app-name>` with your actual Render service name
+- Replace `<your-frontend-domain.com>` with your frontend URL
+- The `PORT` variable is optional - Render sets it automatically, but you can set it to `10000` explicitly
+- Use the **Internal Database URL** (not External) for better performance
+
+#### Step 7: Deploy and Verify
+
+1. Click **"Save Changes"** in the Environment tab
+2. Render will automatically start building and deploying
+3. Monitor the build logs for any errors
+4. Once deployed, test the health endpoint:
+   ```bash
+   curl https://your-app-name.onrender.com/health
+   ```
+
+#### Step 8: Connect Database to Web Service
+
+1. In your PostgreSQL database dashboard on Render
+2. Go to **"Connections"** tab
+3. Your web service should automatically connect if using `render.yaml`
+4. If not, manually add the web service to allowed connections
+
+#### Render-Specific Considerations
+
+- **Ephemeral Filesystem**: Local file storage (`./uploads`) will be lost on each deploy. Always use S3 in production.
+- **Auto-Deploy**: Render automatically deploys on every push to your main branch (configurable)
+- **Free Tier Limits**: 
+  - Services spin down after 15 minutes of inactivity
+  - First request after spin-down may take 30-60 seconds
+  - Consider upgrading to paid plan for always-on service
+- **Database**: Free tier PostgreSQL has connection limits. Upgrade if you expect high traffic.
+- **Environment Variables**: Changes require a new deployment. Plan accordingly.
+
+#### Troubleshooting Render Deployment
+
+**Build Fails:**
+- Check build logs in Render dashboard
+- Ensure `package.json` has correct `build` and `start` scripts
+- Verify Node.js version in `.nvmrc` matches Render's supported versions
+
+**Database Connection Fails:**
+- Verify `DATABASE_URL` is set correctly
+- Use Internal Database URL (not External)
+- Check database is in same region as web service
+- Ensure database is not paused (free tier pauses after inactivity)
+
+**File Upload Fails:**
+- Verify `STORAGE_TYPE=s3` is set
+- Check all AWS credentials are correct
+- Verify S3 bucket exists and IAM user has permissions
+- Check S3 bucket CORS configuration if accessing from frontend
+
+**Google OAuth Redirect Error:**
+- Verify `GOOGLE_CALLBACK_URL` matches exactly in Google Console
+- Ensure callback URL uses `https://` (not `http://`)
+- Check that your Render service URL is correct
+
+**Service Keeps Restarting:**
+- Check application logs for errors
+- Verify all required environment variables are set
+- Check database connection is working
+- Review error logs in Render dashboard
+
+### Other Deployment Options
+
+#### Environment Setup
 
 1. Set `NODE_ENV=production` in your `.env` file
 2. Use strong, unique secrets for `SESSION_SECRET` and `JWT_SECRET`
@@ -362,13 +578,13 @@ For production deployments, configure AWS S3:
 4. Configure your production database URL
 5. Set up AWS S3 for file storage (recommended)
 
-### Build for Production
+#### Build for Production
 
 ```bash
 npm run build
 ```
 
-### Process Management
+#### Process Management
 
 Use a process manager like PM2:
 
@@ -379,7 +595,7 @@ pm2 save
 pm2 startup
 ```
 
-### Docker (Optional)
+#### Docker (Optional)
 
 You can containerize the application:
 

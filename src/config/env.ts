@@ -4,7 +4,7 @@ dotenv.config();
 
 // Validate required environment variables
 const requiredEnvVars = [
-  'MONGODB_URI',
+  'DATABASE_URL',
   'SESSION_SECRET',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
@@ -25,7 +25,6 @@ export const env = {
 
   // Database
   DATABASE_URL: process.env.DATABASE_URL || '',
-  MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/twospoon-drive',
 
   // Session
   SESSION_SECRET: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
